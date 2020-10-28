@@ -105,7 +105,7 @@ lval eval_op(lval x, char* op, lval y) {
 	if (x.type == LVAL_ERR) { return x; }
 	if (y.type == LVAL_ERR) { return y; }
 
-	
+	// check
 	if(x.type == LVAL_NUM && y.type == LVAL_NUM) { return int_ops(x, op, y); }
 	
 	if(x.type == LVAL_DOUBLE || y.type == LVAL_DOUBLE) { return double_ops(x, op, y); }
