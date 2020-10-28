@@ -30,22 +30,24 @@ enum { LVAL_NUM, LVAL_DOUBLE, LVAL_ERR };
 
 typedef struct {
 	int type;
-	long num;
-	double double_num;
+	union {
+		long num;
+		double dnum;
+	} data;
 	int err;
 } lval;
 
 lval lval_double(double x) {
 	lval v;
 	v.type = LVAL_DOUBLE;
-	v.double_num = x;
+	v.data.dnum = x;
 	return v;
 }
 
 lval lval_num(long x) {
 	lval v;
 	v.type = LVAL_NUM;
-	v.num = x;
+	v.data.num = x;
 	return v;
 }
 
@@ -58,8 +60,8 @@ lval lval_err(int x) {
 
 void lval_print(lval v) {
 	switch(v.type) {
-	case LVAL_NUM: printf("%li", v.num); break;
-	case LVAL_DOUBLE: printf("%lf", v.double_num); break;
+	case LVAL_NUM: printf("%li", v.data.num); break;
+	case LVAL_DOUBLE: printf("%lf", v.data.dnum); break;
 	case LVAL_ERR:
 		switch(v.err){
 			case LERR_DIV_ZERO: printf("Error: Division by zero not gud"); break;
@@ -68,24 +70,45 @@ void lval_print(lval v) {
 		}
 	}
 }
+lval double_ops(lval x, char* op, lval y) {
+	double x0 = x.type == LVAL_DOUBLE ? x.data.dnum : (double) x.data.num;
+	double y0 = y.type == LVAL_DOUBLE ? y.data.dnum : (double) y.data.num;
+	
+	if(strcmp(op, "+") == 0) { return lval_double(x0 + y0); }
+	if(strcmp(op, "-") == 0) { return lval_double(x0 - y0); }	
+	if(strcmp(op, "*") == 0) { return lval_double(x0 * y0); }
+	if(strcmp(op, "/") == 0) { return y0 == 0 ? lval_err(LERR_DIV_ZERO) : lval_double(x0 / y0); }
+	if(strcmp(op, "%") == 0) { return lval_double(fmod(x0, y0)); }
+	if(strcmp(op, "^") == 0) { return lval_double(pow(x0,y0)); }
+	if(strcmp(op, "min") == 0) { return (x0 <= y0) ? lval_double(x0) : lval_double(y0);}
+	if(strcmp(op, "max") == 0) { return (x0 >= y0) ? lval_double(x0) : lval_double(y0);}
+	
+	return lval_err(LERR_BAD_OP);
+}
+
+lval int_ops(lval x, char* op, lval y) {
+	if(strcmp(op, "+") == 0) { return lval_num(x.data.num + y.data.num); }
+	if(strcmp(op, "-") == 0) { return lval_num(x.data.num - y.data.num); }	
+	if(strcmp(op, "*") == 0) { return lval_num(x.data.num * y.data.num); }
+	if(strcmp(op, "/") == 0) { return y.data.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.data.num / y.data.num); }
+	if(strcmp(op, "%") == 0) { return lval_num(x.data.num % y.data.num); }
+	if(strcmp(op, "^") == 0) { return lval_num(pow(x.data.num,y.data.num)); }
+	if(strcmp(op, "min") == 0) { return (x.data.num <= y.data.num) ? lval_num(x.data.num) : lval_num(y.data.num);}
+	if(strcmp(op, "max") == 0) { return (x.data.num >= y.data.num) ? lval_num(x.data.num) : lval_num(y.data.num);}
+	
+	return lval_err(LERR_BAD_OP);
+}
 
 void lval_println(lval v) { lval_print(v); putchar('\n'); }
 
 lval eval_op(lval x, char* op, lval y) { 
 	if (x.type == LVAL_ERR) { return x; }
 	if (y.type == LVAL_ERR) { return y; }
+
 	
+	if(x.type == LVAL_NUM && y.type == LVAL_NUM) { return int_ops(x, op, y); }
 	
-	
-	
-	if(strcmp(op, "+") == 0) { return lval_num(x.num + y.num); }
-	if(strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }	
-	if(strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
-	if(strcmp(op, "/") == 0) { return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num); }
-	if(strcmp(op, "%") == 0) { return lval_num(x.num % y.num); }
-	if(strcmp(op, "^") == 0) { return lval_num(pow(x.num,y.num)); }
-	if(strcmp(op, "min") == 0) { return (x.num <= y.num) ? lval_num(x.num) : lval_num(y.num);}
-	if(strcmp(op, "max") == 0) { return (x.num >= y.num) ? lval_num(x.num) : lval_num(y.num);}
+	if(x.type == LVAL_DOUBLE || y.type == LVAL_DOUBLE) { return double_ops(x, op, y); }
 	
 	
 	return lval_err(LERR_BAD_OP);
@@ -120,14 +143,13 @@ lval eval(mpc_ast_t* t){
 		i++;
 	}
 	
-	if(strcmp(op, "-") == 0 && strstr(t->tag, "number")){ return lval_num(x.num*-1); }
-	if(strcmp(op, "-") == 0 && strstr(t->tag, "decimal")){ return lval_double(x.num*-1); }
+	if(strcmp(op, "-") == 0 && strstr(t->tag, "number")){ return lval_num(x.data.num*-1); }
+	if(strcmp(op, "-") == 0 && strstr(t->tag, "decimal")){ return lval_double(x.data.num*-1); }
 	return x;
 }
 
 int main(int argc, char** argv) {
 	
-	printf("%d", 10/3);
 	mpc_parser_t* Number   = mpc_new("number");
 	mpc_parser_t* Decimal  = mpc_new("decimal");
 	mpc_parser_t* Operator = mpc_new("operator");
